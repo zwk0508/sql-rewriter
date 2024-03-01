@@ -6,6 +6,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStreamRewriter;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +33,7 @@ public class SqlVisitor extends SqlBaseBaseVisitor<Void> {
     private Map<ParseTree, String> aliasMap = new HashMap<>();
     private Map<ParseTree, JoinType> joinTypeMap = new HashMap<>();
     private Map<ParseTree, JoinCriteriaContext> joinedCriteriaMap = new HashMap<>();
+    private Map<ParseTree, Boolean> whereExists = new HashMap<>();
 
 
     public SqlVisitor(CommonTokenStream tokenStream, TableAction tableAction) {
@@ -91,6 +93,10 @@ public class SqlVisitor extends SqlBaseBaseVisitor<Void> {
                         type = JoinType.LEFT;
                     } else if (joinType.RIGHT() != null) {
                         type = JoinType.RIGHT;
+                    } else if (joinType.FULL() != null) {
+                        type = JoinType.FULL;
+                    } else {
+                        type = JoinType.INNER;
                     }
                     joinTypeMap.put(relationPrimary, type);
 
@@ -133,19 +139,28 @@ public class SqlVisitor extends SqlBaseBaseVisitor<Void> {
                 BooleanExpressionContext where = context.where;
                 Token token;
                 String sql = sqlCondition.getCondition();
-                if (where == null) {
-                    List<RelationContext> list = context.relation();
-                    RelationContext last = list.get(list.size() - 1);
-                    token = last.getStop();
-                    sql = " where " + sql;
-                } else {
+                Boolean b = whereExists.get(context);
+                if (where != null) {
                     token = where.stop;
                     sql = " and " + sql;
+                    whereExists.put(context, true);
+                } else if (b == null) {
+                    token = context.getStop();
+                    sql = " where " + sql;
+                    whereExists.put(context, true);
+                } else {
+                    token = context.getStop();
+                    sql = " and " + sql;
                 }
+
                 rewriter.insertAfter(token, sql);
             } else {
                 JoinCriteriaContext joinCriteriaContext = joinedCriteriaMap.get(ctx);
-                rewriter.insertAfter(joinCriteriaContext.stop, " and " + sqlCondition.getCondition());
+                TerminalNode terminalNode = joinCriteriaContext.ON();
+                if (terminalNode == null) {
+                    throw new IllegalArgumentException("only support on join criteria");
+                }
+                rewriter.insertAfter(terminalNode.getSymbol(), " " + sqlCondition.getCondition() + " and ");
             }
         }
 
