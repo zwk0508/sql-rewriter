@@ -22,7 +22,7 @@ sql条件 condition: 拼接的语句 location: 拼接的位置
 
 meetTable方法有三个参数:
 
-1. 表名 不带引号或反引号的单纯表名 sql中 `database`.`table_name` 会被转为 database.table_name
+1. 表名 不带引号或反引号的单纯表名 sql中 \`database\`.\`table_name\` 会被转为 database.table_name
 2. 别名 同表名处理方式
 3. 连接类型 参见com.zwk.sql.JoinType
 
